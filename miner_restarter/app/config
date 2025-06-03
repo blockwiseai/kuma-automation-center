@@ -1,0 +1,8 @@
+SSH_USERNAME = "miner-restarter"
+SSH_KEY_PATH = "./app/miner-restarter"
+CHECK_INTERVAL = 10  
+CHECK_COUNT = 2
+TIMEOUT_THRESHOLD = 10  
+AWS_IPS = ["98.80.70.48", "34.238.193.115"]
+
+

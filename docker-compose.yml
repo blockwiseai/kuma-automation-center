@@ -1,0 +1,44 @@
+services:
+  uptime-kuma:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: custom-uptime-kuma:latest
+    volumes:
+      - ./data:/app/data
+    ports:
+      - 127.0.0.1:3001:3001
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  status-updater:
+    build:
+      context: ./kuma
+      dockerfile: Dockerfile
+    environment:
+      - KUMA_URL=http://live-kuma:3001
+      - KUMA_USER=admin
+      - KUMA_PASS=
+    restart: unless-stopped
+
+  miner-restarter:
+    build: .
+    restart: unless-stopped
+    environment:
+    - PYTHONUNBUFFERED=1
+    - LOG_LEVEL=DEBUG
+    volumes:
+    - ./config:/app/config
+    networks:
+     - nginx_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
