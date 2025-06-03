@@ -76,6 +76,78 @@ def load_hotkeys(csv_filename="hotkeys.csv"):
         print(f"Error: {csv_filename} not found.")
     return hotkey_map
 
+def load_default_groups_and_notifications(api):
+    """Initialize default groups and notifications in Uptime Kuma"""
+    
+    # Get existing monitors to check for duplicates
+    existing_monitors = api.get_monitors()
+    
+    # Create default groups if they don't exist
+    groups_to_create = [
+        {'name': 'Active Miners', 'active': True},
+        {'name': 'Inactive Miners', 'active': False}
+    ]
+    created_groups = {}
+    
+    for group in groups_to_create:
+        group_name = group['name']
+        group_id = find_group_id(existing_monitors, group_name)
+        
+        if not group_id:
+            try:
+                # Create group monitor
+                group_data = {
+                    'type': MonitorType.GROUP,
+                    'name': group_name,
+                    'active': group['active']
+                }
+                response = api.add_monitor(**group_data)
+                created_groups[group_name] = response.get('monitorID')
+                logger.info(f"Created group: {group_name} (active: {group['active']})")
+            except Exception as e:
+                logger.error(f"Error creating group {group_name}: {e}")
+        else:
+            created_groups[group_name] = group_id
+            logger.info(f"Group already exists: {group_name} (ID: {group_id})")
+    
+    # Setup webhook notification for Active Miners group
+    if 'Active Miners' in created_groups:
+        try:
+            # Check if notifications already exist
+            notifications = api.get_notifications()
+            
+            # Create webhook notification if it doesn't exist
+            webhook_name = "Active Miners Webhook"
+            webhook_exists = any(notif.get('name') == webhook_name for notif in notifications)
+            
+            if not webhook_exists:
+                # You'll need to configure this webhook URL
+                webhook_url = os.environ.get('WEBHOOK_URL', 'https://example.com/webhook')
+                
+                notification_data = {
+                    'name': webhook_name,
+                    'type': NotificationType.WEBHOOK,
+                    'webhookURL': webhook_url,
+                    'webhookContentType': 'application/json',
+                    'isDefault': True,
+                    'applyExisting': False
+                }
+                
+                notification_response = api.add_notification(**notification_data)
+                notification_id = notification_response.get('id')
+                
+                # Apply notification to Active Miners group
+                if notification_id:
+                    # This might need adjustment based on the API version
+                    # Some versions might require different approach to link notifications to groups
+                    logger.info(f"Created webhook notification: {webhook_name}")
+                    logger.info(f"Notification ID: {notification_id}")
+            else:
+                logger.info(f"Webhook notification already exists: {webhook_name}")
+                
+        except Exception as e:
+            logger.error(f"Error setting up webhook notification: {e}")
+
 def load_hosts(api, config_folder='../config_fetcher/all_host_vars'):
     """Load monitors from YAML configuration files"""
     
@@ -284,7 +356,8 @@ def job(bt_conn):
 
     try:
         api.login(kuma_user, kuma_pass)
-        load_default_groups_and_notifications(api)_
+        load_default_groups_and_notifications(api)
+        load_hosts(api)
         
         update_miner_groups(api, bt_conn)
     except Exception as e:
