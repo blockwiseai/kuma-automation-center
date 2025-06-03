@@ -7,7 +7,9 @@ import time
 import bittensor as bt
 import requests
 import schedule
-from uptime_kuma_api import UptimeKumaApi
+from pathlib import Path
+from uptime_kuma_api import UptimeKumaApi, MonitorType, NotificationType
+import yaml
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -73,6 +75,143 @@ def load_hotkeys(csv_filename="hotkeys.csv"):
     except FileNotFoundError:
         print(f"Error: {csv_filename} not found.")
     return hotkey_map
+
+def load_hosts(api, config_folder='../config_fetcher/all_host_vars'):
+    """Load monitors from YAML configuration files"""
+    
+    # Get existing monitors
+    existing_monitors = api.get_monitors()
+    existing_monitors_by_name = {
+        monitor.get('name'): monitor 
+        for monitor in existing_monitors 
+        if monitor.get('type') != 'group'
+    }
+    
+    # Get Active Miners group ID
+    active_group_id = find_group_id(existing_monitors, 'Active Miners')
+    
+    if not active_group_id:
+        logger.warning("Active Miners group not found. Monitors will be created without a parent group.")
+    
+    # Process all YAML files in the config folder
+    config_path = Path(config_folder)
+    if not config_path.exists():
+        logger.error(f"Config folder not found: {config_folder}")
+        return
+    
+    yaml_files = list(config_path.glob('*.yml')) + list(config_path.glob('*.yaml'))
+    
+    for yaml_file in yaml_files:
+        try:
+            with open(yaml_file, 'r') as f:
+                config = yaml.safe_load(f)
+            
+            if not config or 'miners' not in config:
+                logger.warning(f"No miners found in {yaml_file}")
+                continue
+            
+            ansible_host = config.get('ansible_host', 'unknown')
+            provider = config.get('provider', 'unknown')
+            
+            # Process each miner
+            for miner in config['miners']:
+                miner_name = miner.get('name')
+                if not miner_name:
+                    logger.warning(f"Miner without name in {yaml_file}")
+                    continue
+                
+                # Prepare monitor data
+                port = miner.get('port', '8080')
+                branch = miner.get('branch', '')
+                url = f"http://{ansible_host}:{port}"
+                description = f"Provider: {provider}\nBranch: {branch}"
+                
+                monitor_data = {
+                    'type': MonitorType.HTTP,
+                    'name': miner_name,
+                    'url': url,
+                    'interval': 60,  # Check every 60 seconds
+                    'retryInterval': 60,
+                    'maxretries': 3,
+                    'accepted_statuscodes': ["200-299"],
+                    'active': True,
+                    'description': description
+                }
+                
+                # Add to Active Miners group if it exists
+                if active_group_id:
+                    monitor_data['parent'] = active_group_id
+                
+                # Add tags based on provider
+                monitor_data['tags'] = [
+                    {'name': provider, 'color': '#0000FF'},
+                    {'name': 'miner', 'color': '#00FF00'}
+                ]
+                
+                # Check if monitor already exists
+                if miner_name in existing_monitors_by_name:
+                    existing_monitor = existing_monitors_by_name[miner_name]
+                    monitor_id = existing_monitor.get('id')
+                    
+                    # Check if update is needed
+                    needs_update = False
+                    update_fields = {}
+                    
+                    # Check each field for differences
+                    if existing_monitor.get('url') != url:
+                        update_fields['url'] = url
+                        needs_update = True
+                    
+                    if existing_monitor.get('description') != description:
+                        update_fields['description'] = description
+                        needs_update = True
+                    
+                    if existing_monitor.get('interval') != 60:
+                        update_fields['interval'] = 60
+                        needs_update = True
+                    
+                    if existing_monitor.get('retryInterval') != 60:
+                        update_fields['retryInterval'] = 60
+                        needs_update = True
+                    
+                    if existing_monitor.get('maxretries') != 3:
+                        update_fields['maxretries'] = 3
+                        needs_update = True
+                    
+                    # Check if parent group needs update
+                    if active_group_id and existing_monitor.get('parent') != active_group_id:
+                        update_fields['parent'] = active_group_id
+                        needs_update = True
+                    
+                    if needs_update:
+                        try:
+                            # Update the monitor
+                            api.edit_monitor(monitor_id, **update_fields)
+                            logger.info(f"Updated monitor: {miner_name} (ID: {monitor_id}) - Fields: {list(update_fields.keys())}")
+                        except Exception as e:
+                            logger.error(f"Error updating monitor {miner_name}: {e}")
+                    else:
+                        logger.info(f"Monitor already up to date: {miner_name}")
+                else:
+                    # Create new monitor
+                    try:
+                        response = api.add_monitor(**monitor_data)
+                        monitor_id = response.get('monitorID')
+                        logger.info(f"Created monitor: {miner_name} (ID: {monitor_id})")
+                        
+                        # Add custom properties as tags or in description
+                        # Since Uptime Kuma doesn't support arbitrary custom fields,
+                        # we can encode the config in the description or use tags
+                        if miner.get('config'):
+                            # You might want to store important config values as tags
+                            # or append them to the description
+                            pass
+                            
+                    except Exception as e:
+                        logger.error(f"Error creating monitor {miner_name}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error processing {yaml_file}: {e}")
 
 
 def update_miner_groups(api, bt_conn):
@@ -145,33 +284,15 @@ def job(bt_conn):
 
     try:
         api.login(kuma_user, kuma_pass)
+        load_default_groups_and_notifications(api)_
+        
         update_miner_groups(api, bt_conn)
     except Exception as e:
         logging.error(f"Error: {str(e)}")
     finally:
         api.disconnect()
 
-
-def send_heartbeat():
-    url = "https://glitchtip.s6bw.ip-ddns.com/api/0/organizations/blockwise/heartbeat_check/77c14da8-0c16-4f54-816e-e017573a7cad/"
-    try:
-        response = requests.post(url, verify=False)
-        logging.info(
-            f"Heartbeat sent at {time.strftime('%H:%M:%S')}, Status: {response.status_code}"
-        )
-    except Exception as e:
-        logging.error(f"Error sending heartbeat: {e}")
-
-
 def main():
-    import sentry_sdk
-
-    sentry_sdk.init(
-        dsn="https://954714da13e5494ea9bec6a88dfd9a60@glitchtip.s6bw.ip-ddns.com/3",
-        traces_sample_rate=1.0,
-        enable_tracing=True,
-    )
-    send_heartbeat()
 
     logging.info("Auto updater started")
     bt_conn = BittensorConnection()
@@ -182,7 +303,7 @@ def main():
     logging.info(f"Update interval: {interval_mins} min")
 
     schedule.every(2).minutes.do(lambda: job(bt_conn))
-    schedule.every(10).minutes.do(send_heartbeat)
+
 
     while True:
         schedule.run_pending()
