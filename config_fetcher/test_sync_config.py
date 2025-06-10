@@ -134,7 +134,7 @@ class TestProcessMiners:
         }
 
         reader = ConfigReader()
-        reader.configs_by_id = {"param": "value"}
+        reader.configs_by_id = {"1": {"param": "value"}}
         active_hosts, all_hosts = reader.process_miners()
 
         host_data = all_hosts['s6_6a1']

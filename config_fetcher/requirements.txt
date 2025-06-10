@@ -4,6 +4,7 @@ google-auth-httplib2
 google-api-python-client
 pyyaml
 cryptography
+apscheduler
 
 pytest
 pytest-mock
