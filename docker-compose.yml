@@ -19,6 +19,8 @@ services:
     build:
       context: ./kuma_updater
       dockerfile: Dockerfile
+    volumes:
+      - config_storage:/app/config_storage
     environment:
       KUMA_URL: http://live-kuma:3001
       KUMA_USER: admin
@@ -33,8 +35,6 @@ services:
     environment:
       PYTHONUNBUFFERED: 1
       LOG_LEVEL: DEBUG
-    volumes:
-    - ./config.env:/app/config.env
     logging:
       driver: "json-file"
       options:
@@ -45,4 +45,13 @@ services:
     build:
       context: ./config_fetcher
       dockerfile: Dockerfile
+    volumes:
+      - config_storage:/app/all_host_vars
+    environment:
+      SPREADSHEET_ID: ${SPREADSHEET_ID}
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     restart: unless-stopped
+
+volumes:
+  config_storage:
+
