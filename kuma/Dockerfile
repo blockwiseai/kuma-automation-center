@@ -1,4 +1,4 @@
-FROM louislam/uptime-kuma:1
+FROM louislam/uptime-kuma:latest
 
 COPY init_admin.sh /init_admin.sh
 RUN chmod +x /init_admin.sh

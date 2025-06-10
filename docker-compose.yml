@@ -1,7 +1,7 @@
 services:
   uptime-kuma:
     build:
-      context: .
+      context: ./kuma
       dockerfile: Dockerfile
     image: custom-uptime-kuma:latest
     volumes:
@@ -17,28 +17,32 @@ services:
 
   status-updater:
     build:
-      context: ./kuma
+      context: ./kuma_updater
       dockerfile: Dockerfile
     environment:
-      - KUMA_URL=http://live-kuma:3001
-      - KUMA_USER=admin
-      - KUMA_PASS=
+      KUMA_URL: http://live-kuma:3001
+      KUMA_USER: admin
+      KUMA_PASS:
     restart: unless-stopped
 
   miner-restarter:
-    build: .
+    build:
+      context: ./miner_restarter
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-    - PYTHONUNBUFFERED=1
-    - LOG_LEVEL=DEBUG
+      PYTHONUNBUFFERED: 1
+      LOG_LEVEL: DEBUG
     volumes:
-    - ./config:/app/config
-    networks:
-     - nginx_network
+    - ./config.env:/app/config.env
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-
+  config_fetcher:
+    build:
+      context: ./config_fetcher
+      dockerfile: Dockerfile
+    restart: unless-stopped
