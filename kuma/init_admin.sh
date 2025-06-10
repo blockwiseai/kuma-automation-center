@@ -3,18 +3,15 @@ set -e
 
 DB_PATH="/app/data/kuma.db"
 
-# 1) If the database file doesn’t exist yet, start Kuma briefly so it creates its tables
 if [ ! -f "$DB_PATH" ]; then
   echo "[init_admin] No database found; starting Kuma to initialize schema…"
   node server/server.js &
   KUMA_PID=$!
 
-  # Wait until the file appears
   while [ ! -f "$DB_PATH" ]; do
     sleep 1
   done
 
-  # Give it a moment to finish migrations
   sleep 3
 
   # Stop the temporary instance
@@ -22,13 +19,11 @@ if [ ! -f "$DB_PATH" ]; then
   wait $KUMA_PID 2>/dev/null || true
 fi
 
-# 2) Check if any users already exist
 USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM user;" 2>/dev/null || echo "0")
 if [ "$USER_COUNT" -eq 0 ]; then
   echo "[init_admin] No users found; inserting initial admin…"
 
   # The bcrypt hash for “counter123” (salt rounds = 10)
-  # (pre-computed so that we don’t need to run bcrypt at runtime)
   SQLITE_HASH='$2b$10$ixKQTXKjELdwVUGm8fzxxeF5E5m6oxkgxQ7Q/r60B7WR6Ycg5jMzS'
 
   sqlite3 "$DB_PATH" <<'EOF'
@@ -46,6 +41,4 @@ else
   echo "[init_admin] Detected $USER_COUNT existing user(s); skipping insert."
 fi
 
-# 3) Exec Kuma normally so logs go to stdout/stderr
 exec node server/server.js
-
