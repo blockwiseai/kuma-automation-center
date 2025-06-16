@@ -3,11 +3,7 @@ set -e
 
 DB_PATH="/app/data/kuma.db"
 # Use environment variable if set, otherwise use parameter, otherwise use default
-if [ -n "$KUMA_PASS_HASH" ]; then
-  PASSWORD_HASH="$KUMA_PASS_HASH"
-else
-  PASSWORD_HASH="${1:-\$2b\$10\$ixKQTXKjELdwVUGm8fzxxeF5E5m6oxkgxQ7Q/r60B7WR6Ycg5jMzS}"
-fi
+ADMIN_PASSWORD="${KUMA_PASS:-${1:-counter123}}"
 
 if [ ! -f "$DB_PATH" ]; then
   echo "[init_admin] No database found; starting Kuma to initialize schema…"
@@ -27,20 +23,28 @@ fi
 
 USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM user;" 2>/dev/null || echo "0")
 if [ "$USER_COUNT" -eq 0 ]; then
-  echo "[init_admin] No users found; inserting initial admin…"
+  echo "[init_admin] No users found; creating initial admin…"
 
-  # Insert the admin user with the provided hash
+  # Generate bcrypt hash for the provided password
+  HASHED_PASSWORD=$(node -e "
+    const bcrypt = require('bcryptjs');
+    const password = process.argv[1];
+    const hash = bcrypt.hashSync(password, 10);
+    console.log(hash);
+  " "$ADMIN_PASSWORD")
+
+  # Insert the admin user with the hashed password
   sqlite3 "$DB_PATH" <<EOF
 INSERT INTO "user" (
   "username",
   "password"
 ) VALUES (
   'admin',
-  '$PASSWORD_HASH'
+  '$HASHED_PASSWORD'
 );
 EOF
 
-  echo "[init_admin] Admin user 'admin' created with provided password hash."
+  echo "[init_admin] Admin user 'admin' created."
 else
   echo "[init_admin] Detected $USER_COUNT existing user(s); skipping insert."
 fi

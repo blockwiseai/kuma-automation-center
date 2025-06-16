@@ -9,7 +9,7 @@ services:
     ports:
       - 127.0.0.1:3001:3001
     environment:
-      KUMA_PASS_HASH: ${KUMA_PASS_HASH}
+      KUMA_PASS: ${KUMA_PASS}
     restart: unless-stopped
     logging:
       driver: "json-file"
