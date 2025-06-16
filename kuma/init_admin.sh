@@ -2,6 +2,12 @@
 set -e
 
 DB_PATH="/app/data/kuma.db"
+# Use environment variable if set, otherwise use parameter, otherwise use default
+if [ -n "$KUMA_PASS_HASH" ]; then
+  PASSWORD_HASH="$KUMA_PASS_HASH"
+else
+  PASSWORD_HASH="${1:-\$2b\$10\$ixKQTXKjELdwVUGm8fzxxeF5E5m6oxkgxQ7Q/r60B7WR6Ycg5jMzS}"
+fi
 
 if [ ! -f "$DB_PATH" ]; then
   echo "[init_admin] No database found; starting Kuma to initialize schema…"
@@ -23,20 +29,18 @@ USER_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM user;" 2>/dev/null || echo
 if [ "$USER_COUNT" -eq 0 ]; then
   echo "[init_admin] No users found; inserting initial admin…"
 
-  # The bcrypt hash for “counter123” (salt rounds = 10)
-  SQLITE_HASH='$2b$10$ixKQTXKjELdwVUGm8fzxxeF5E5m6oxkgxQ7Q/r60B7WR6Ycg5jMzS'
-
-  sqlite3 "$DB_PATH" <<'EOF'
+  # Insert the admin user with the provided hash
+  sqlite3 "$DB_PATH" <<EOF
 INSERT INTO "user" (
   "username",
   "password"
 ) VALUES (
   'admin',
-  '$2b$10$ixKQTXKjELdwVUGm8fzxxeF5E5m6oxkgxQ7Q/r60B7WR6Ycg5jMzS'
+  '$PASSWORD_HASH'
 );
 EOF
 
-  echo "[init_admin] Admin user 'admin' created (password = counter123)."
+  echo "[init_admin] Admin user 'admin' created with provided password hash."
 else
   echo "[init_admin] Detected $USER_COUNT existing user(s); skipping insert."
 fi
