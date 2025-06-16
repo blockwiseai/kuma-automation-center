@@ -88,11 +88,11 @@ class ConfigReader:
                 "branch": row_dict["Branch"],
                 "config": config,
                 "secrets": {
-                    "openai_key": self.encryption_manager.encrypt(row_dict["OpenAI API key"]),
-                    "anthropic_key": self.encryption_manager.encrypt(row_dict["Anthropic API key"]),
-                    "google_key": self.encryption_manager.encrypt(row_dict["Google API key"]),
-                    "azure_key": self.encryption_manager.encrypt(row_dict["Azure API key"]),
-                    "perplexity_key": self.encryption_manager.encrypt(row_dict["Perplexity API key"]),
+                    "openai_key": self.encryption_manager.encrypt(row_dict.get("OpenAI API key", "")),
+                    "anthropic_key": self.encryption_manager.encrypt(row_dict.get("Anthropic API key", "")),
+                    "google_key": self.encryption_manager.encrypt(row_dict.get("Google API key", "")),
+                    "azure_key": self.encryption_manager.encrypt(row_dict.get("Azure API key", "")),
+                    "perplexity_key": self.encryption_manager.encrypt(row_dict.get("Perplexity API key", "")),
                 },
             }
 
