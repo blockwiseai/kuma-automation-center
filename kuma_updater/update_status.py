@@ -84,6 +84,52 @@ def load_hotkeys(csv_filename="hotkeys.csv"):
     return hotkey_map
 
 
+def setup_email_notification(api):
+    """Setup email notification if configured"""
+    # Get email configuration from environment
+    email_to = os.getenv('NOTIFICATION_MAIL')
+    
+    # Check if email is configured
+    if not email_to:
+        logger.info("EMAIL_TO not configured, skipping email notification setup")
+        return None
+    
+    try:
+        # Check if email notification already exists
+        notifications = api.get_notifications()
+        email_notification_name = "Miner Status Email Alerts"
+        
+        for notif in notifications:
+            if notif.get('name') == email_notification_name:
+                logger.info(f"Email notification already exists: {email_notification_name}")
+                return notif.get('id')
+        
+        # Create minimal email notification using local mail agent
+        notification_data = {
+            'name': email_notification_name,
+            'type': NotificationType.SMTP,
+            'hostname': 'localhost',  # Use local mail agent
+            'port': 25,  # Standard SMTP port
+            'security': 'none',  # No security for localhost
+            'ignoreTLSError': True,
+            'username': '',  # No auth needed for localhost
+            'password': '',  # No auth needed for localhost
+            'fromEmail': f'uptime-kuma@{os.uname().nodename}',  # Use hostname
+            'toEmail': email_to,
+            'isDefault': True,
+            'applyExisting': True  # Apply to all existing monitors
+        }
+        
+        response = api.add_notification(**notification_data)
+        notification_id = response.get('id')
+        logger.info(f"Created email notification: {email_notification_name} (ID: {notification_id})")
+        return notification_id
+        
+    except Exception as e:
+        logger.error(f"Error setting up email notification: {e}")
+        return None
+
+
 def load_default_groups_and_notifications(api):
     """Initialize default groups and notifications in Uptime Kuma"""
 
@@ -175,6 +221,9 @@ def load_default_groups_and_notifications(api):
 
         except Exception as e:
             logger.error(f"Error setting up webhook notification: {e}")
+    
+    # Setup email notification
+    setup_email_notification(api)
 
 
 def load_hosts(api, config_folder=os.path.join(os.getcwd(), 'host_vars/')):
