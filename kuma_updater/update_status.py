@@ -130,6 +130,40 @@ def setup_email_notification(api):
         return None
 
 
+def setup_internal_webhook_notification(api):
+    """Setup internal webhook notification for miner-restarter"""
+    webhook_url = os.getenv('INTERNAL_WEBHOOK_URL', 'http://miner-restarter:9999/webhook')
+    
+    try:
+        # Check if internal webhook notification already exists
+        notifications = api.get_notifications()
+        webhook_notification_name = "Miner Restarter Webhook"
+        
+        for notif in notifications:
+            if notif.get('name') == webhook_notification_name:
+                logger.info(f"Internal webhook notification already exists: {webhook_notification_name}")
+                return notif.get('id')
+        
+        # Create webhook notification
+        notification_data = {
+            'name': webhook_notification_name,
+            'type': NotificationType.WEBHOOK,
+            'webhookURL': webhook_url,
+            'webhookContentType': 'application/json',
+            'isDefault': True,
+            'applyExisting': True  # Apply to all existing monitors
+        }
+        
+        response = api.add_notification(**notification_data)
+        notification_id = response.get('id')
+        logger.info(f"Created internal webhook notification: {webhook_notification_name} (ID: {notification_id})")
+        return notification_id
+        
+    except Exception as e:
+        logger.error(f"Error setting up internal webhook notification: {e}")
+        return None
+
+
 def load_default_groups_and_notifications(api):
     """Initialize default groups and notifications in Uptime Kuma"""
 
@@ -224,6 +258,9 @@ def load_default_groups_and_notifications(api):
     
     # Setup email notification
     setup_email_notification(api)
+    
+    # Setup internal webhook notification for miner-restarter
+    setup_internal_webhook_notification(api)
 
 
 def load_hosts(api, config_folder=os.path.join(os.getcwd(), 'host_vars/')):
