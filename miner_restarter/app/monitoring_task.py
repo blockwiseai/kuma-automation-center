@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings
 from typing import Dict, List
 from pydantic import Field
 from datetime import datetime
-from app.webhook_handler import send_discord_error_notification
+from app.webhook_handler import send_notification_to_all
 import sys
 from dotenv import load_dotenv
 import os
@@ -98,7 +98,7 @@ class MonitoringTask:
                     message = f"""
                     MINER-RESTARTER                     
                     Successfully restarted miner {service_name} on {hostname}"""
-                    send_discord_error_notification(message)
+                    send_notification_to_all(message)
 
                     logger.info(
                         f"Successfully restarted {service_name} on {hostname}")
@@ -106,7 +106,7 @@ class MonitoringTask:
                     message = f"""
                     MINER-RESTARTER                     
                     Failed to restart miner {service_name} on {hostname}"""
-                    send_discord_error_notification(message)
+                    send_notification_to_all(message)
                     logger.error(
                         f"Failed to restart {service_name}: {result.stderr}")
         except Exception as e:
@@ -140,9 +140,9 @@ class MonitoringTask:
                 After {settings.CHECK_COUNT} checks in {settings.CHECK_INTERVAL} second intervals and {settings.TIMEOUT_THRESHOLD} second timeout the {monitor_name} miner didn't respond.
                 Scheduling restart...\n
                 """
-                send_discord_error_notification(message)
+                send_notification_to_all(message)
             except Exception as e:
-                logger.error(f"Failed to send discord message: {str(e)}")
+                logger.error(f"Failed to send notifications: {str(e)}")
             try:
                 hostname = url.split("://")[1].split(":")[0]
                 await self.restart_service(hostname, monitor_name)
