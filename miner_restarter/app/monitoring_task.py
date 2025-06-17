@@ -114,6 +114,12 @@ class MonitoringTask:
 
     async def monitor_and_restart(self, url: str, monitor_name: str):
         logger.info(f"Starting monitoring task for {url} ({monitor_name})")
+        
+        # Add validation for url parameter
+        if not url:
+            logger.error(f"URL is None or empty for monitor {monitor_name}")
+            return
+        
         settings = Settings()
         failures = 0
         checks = 0
@@ -144,8 +150,12 @@ class MonitoringTask:
             except Exception as e:
                 logger.error(f"Failed to send notifications: {str(e)}")
             try:
-                hostname = url.split("://")[1].split(":")[0]
-                await self.restart_service(hostname, monitor_name)
+                # Use the existing extract_hostname method instead of inline parsing
+                hostname = self.extract_hostname(url)
+                if hostname:
+                    await self.restart_service(hostname, monitor_name)
+                else:
+                    logger.error(f"Could not extract hostname from URL: {url}")
             except Exception as e:
                 logger.error(f"Failed to initiate restart: {str(e)}")
 
