@@ -1,4 +1,5 @@
 # Kuma Center
+![prezentacja_kac drawio](https://github.com/user-attachments/assets/b44e88f4-f1b5-4f0c-b5ed-0cf5053054a4)
 
 This project automates the monitoring using Up-time Kuma and adds restarting of miners. It consists of four main components:
 
